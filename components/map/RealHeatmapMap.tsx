@@ -132,7 +132,7 @@ const legendItems = [
 
 export default function RealHeatmapMap() {
   return (
-    <div className="relative w-full h-full">
+    <div className="absolute inset-0">
       <MapContainer
         // Mexico City centre
         center={[19.4326, -99.1332]}

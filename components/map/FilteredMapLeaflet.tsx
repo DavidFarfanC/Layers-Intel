@@ -94,7 +94,7 @@ interface Props {
 
 export default function FilteredMapLeaflet({ incidents, viewMode }: Props) {
   return (
-    <div className="relative w-full h-full">
+    <div className="absolute inset-0">
       <MapContainer
         center={[19.41, -99.15]}
         zoom={11}

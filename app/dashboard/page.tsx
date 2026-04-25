@@ -313,11 +313,10 @@ export default function DashboardPage() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0"
-                        style={{ minHeight: 400 }}
+                        className="flex flex-col lg:flex-row gap-4"
                       >
                         {/* Filters — desktop: sidebar; mobile: collapsible panel */}
-                        <div className={`lg:w-52 lg:shrink-0 rounded-2xl border border-slate-100 bg-white shadow-card overflow-hidden ${mobileFiltersOpen ? "block" : "hidden lg:block"}`}>
+                        <div className={`lg:w-52 lg:shrink-0 lg:h-[520px] rounded-2xl border border-slate-100 bg-white shadow-card overflow-hidden ${mobileFiltersOpen ? "block" : "hidden lg:block"}`}>
                           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 lg:hidden">
                             <span className="text-xs font-semibold text-slate-700">Filtros</span>
                             <button onClick={() => setMobileFiltersOpen(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
@@ -331,17 +330,16 @@ export default function DashboardPage() {
                           />
                         </div>
 
-                        {/* Map */}
-                        <div className="flex-1 min-w-0 rounded-2xl border border-slate-100 shadow-card overflow-hidden h-[360px] lg:h-auto">
+                        {/* Map — no flex-1 on mobile so h-[360px] is the authoritative height Leaflet sees */}
+                        <div className="min-w-0 lg:flex-1 rounded-2xl border border-slate-100 shadow-card overflow-hidden h-[360px] sm:h-[420px] lg:h-[520px]">
                           <DashboardMap
                             incidents={filtered}
                             viewMode={viewMode}
-                            className="h-full"
                           />
                         </div>
 
                         {/* Right panels */}
-                        <div className="lg:w-64 lg:shrink-0 flex flex-col gap-4 lg:overflow-y-auto">
+                        <div className="lg:w-64 lg:shrink-0 flex flex-col gap-4 lg:h-[520px] lg:overflow-y-auto">
                           {/* Alerts */}
                           <div className="rounded-2xl border border-slate-100 bg-white shadow-card p-4">
                             <div className="flex items-center justify-between mb-3">

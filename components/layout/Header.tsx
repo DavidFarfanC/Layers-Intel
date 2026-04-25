@@ -63,7 +63,7 @@ export default function Header() {
           {/* CTA escritorio */}
           <div className="hidden md:flex items-center gap-3">
             <a
-              href="#cta"
+              href="/login"
               className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
               Iniciar Sesión

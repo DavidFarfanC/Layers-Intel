@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Map,
   BarChart3,
+  Box,
   Layers2,
   CircleDot,
   TrendingUp,
@@ -39,6 +40,7 @@ import DigitalSignalsView from "@/components/dashboard/sections/DigitalSignalsVi
 import ReportsView from "@/components/dashboard/sections/ReportsView";
 import SettingsView from "@/components/dashboard/sections/SettingsView";
 import LiveHeatmapMap from "@/components/map/LiveHeatmapMap";
+import Mapbox3DVolumeMapWrapper from "@/components/map/Mapbox3DVolumeMapWrapper";
 import type { MapViewMode } from "@/components/map/FilteredMapLeaflet";
 
 // ── Derived stats helpers ─────────────────────────────────────────────────────
@@ -94,7 +96,7 @@ const SEV_ICONS = {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type ActiveTab = "map" | "analytics";
+type ActiveTab = "map" | "analytics" | "3d";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -260,25 +262,29 @@ export default function DashboardPage() {
                   {/* Tab + view toggle bar */}
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="flex rounded-xl border border-slate-200 bg-white p-1 gap-1 shadow-sm">
-                      {([["map", Map, "Vista de Mapa"], ["analytics", BarChart3, "Analítica"]] as const).map(
-                        ([id, Icon, label]) => (
-                          <button
-                            key={id}
-                            onClick={() => setActiveTab(id)}
-                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                              activeTab === id
-                                ? "bg-brand-600 text-white shadow-sm"
-                                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                            }`}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                            {label}
-                          </button>
-                        )
-                      )}
+                      {(
+                        [
+                          ["map",       Map,      "Vista de Mapa"],
+                          ["analytics", BarChart3, "Analítica"   ],
+                          ["3d",        Box,       "3D"          ],
+                        ] as const
+                      ).map(([id, Icon, label]) => (
+                        <button
+                          key={id}
+                          onClick={() => setActiveTab(id)}
+                          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                            activeTab === id
+                              ? "bg-brand-600 text-white shadow-sm"
+                              : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {label}
+                        </button>
+                      ))}
                     </div>
 
-                    {activeTab === "map" && (
+                    {(activeTab === "map") && (
                       <>
                         {/* View mode toggle — hidden when live data is on */}
                         {!liveData && (
@@ -515,7 +521,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       </motion.div>
-                    ) : (
+                    ) : activeTab === "analytics" ? (
                       <motion.div
                         key="analytics-tab"
                         initial={{ opacity: 0 }}
@@ -524,6 +530,18 @@ export default function DashboardPage() {
                         transition={{ duration: 0.2 }}
                       >
                         <AnalyticsCharts incidents={filtered} />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="3d-tab"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="rounded-2xl border border-slate-800 shadow-card overflow-hidden bg-slate-900">
+                          <Mapbox3DVolumeMapWrapper />
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>

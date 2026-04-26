@@ -38,6 +38,7 @@ import CTIView from "@/components/dashboard/cti/CTIView";
 import DigitalSignalsView from "@/components/dashboard/sections/DigitalSignalsView";
 import ReportsView from "@/components/dashboard/sections/ReportsView";
 import SettingsView from "@/components/dashboard/sections/SettingsView";
+import LiveHeatmapMap from "@/components/map/LiveHeatmapMap";
 import type { MapViewMode } from "@/components/map/FilteredMapLeaflet";
 
 // ── Derived stats helpers ─────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ export default function DashboardPage() {
   const [activePage, setActivePage]         = useState<SidebarPage>("dashboard");
   const [activeTab, setActiveTab]           = useState<ActiveTab>("map");
   const [viewMode, setViewMode]             = useState<MapViewMode>("heatmap");
+  const [liveData, setLiveData]             = useState(false);
   const [filters, setFilters]               = useState<FilterState>(DEFAULT_FILTERS);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -278,33 +280,51 @@ export default function DashboardPage() {
 
                     {activeTab === "map" && (
                       <>
-                        <div className="flex rounded-xl border border-slate-200 bg-white p-1 gap-1 shadow-sm">
-                          {([["heatmap", Layers2, "Mapa de Calor"], ["markers", CircleDot, "Marcadores"]] as const).map(
-                            ([id, Icon, label]) => (
-                              <button
-                                key={id}
-                                onClick={() => setViewMode(id)}
-                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                                  viewMode === id
-                                    ? "bg-slate-800 text-white shadow-sm"
-                                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                                }`}
-                              >
-                                <Icon className="h-3.5 w-3.5" />
-                                {label}
-                              </button>
-                            )
-                          )}
-                        </div>
+                        {/* View mode toggle — hidden when live data is on */}
+                        {!liveData && (
+                          <div className="flex rounded-xl border border-slate-200 bg-white p-1 gap-1 shadow-sm">
+                            {([["heatmap", Layers2, "Mapa de Calor"], ["markers", CircleDot, "Marcadores"]] as const).map(
+                              ([id, Icon, label]) => (
+                                <button
+                                  key={id}
+                                  onClick={() => setViewMode(id)}
+                                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                                    viewMode === id
+                                      ? "bg-slate-800 text-white shadow-sm"
+                                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  <Icon className="h-3.5 w-3.5" />
+                                  {label}
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
 
-                        {/* Mobile filters toggle */}
+                        {/* Live data toggle */}
                         <button
-                          onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-                          className="lg:hidden flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-all"
+                          onClick={() => setLiveData(!liveData)}
+                          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all shadow-sm ${
+                            liveData
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                          }`}
                         >
-                          <SlidersHorizontal className="h-3.5 w-3.5" />
-                          Filtros
+                          <span className={`h-1.5 w-1.5 rounded-full ${liveData ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                          {liveData ? "Datos reales · Supabase" : "Datos reales"}
                         </button>
+
+                        {/* Mobile filters toggle — hidden in live mode */}
+                        {!liveData && (
+                          <button
+                            onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+                            className="lg:hidden flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-all"
+                          >
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                            Filtros
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -320,27 +340,30 @@ export default function DashboardPage() {
                         transition={{ duration: 0.2 }}
                         className="flex flex-col lg:flex-row gap-4"
                       >
-                        {/* Filters — desktop: sidebar; mobile: collapsible panel */}
-                        <div className={`lg:w-52 lg:shrink-0 lg:h-[520px] rounded-2xl border border-slate-100 bg-white shadow-card overflow-hidden ${mobileFiltersOpen ? "block" : "hidden lg:block"}`}>
-                          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 lg:hidden">
-                            <span className="text-xs font-semibold text-slate-700">Filtros</span>
-                            <button onClick={() => setMobileFiltersOpen(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
-                              <X className="h-4 w-4" />
-                            </button>
+                        {/* Filters — hidden in live data mode */}
+                        {!liveData && (
+                          <div className={`lg:w-52 lg:shrink-0 lg:h-[520px] rounded-2xl border border-slate-100 bg-white shadow-card overflow-hidden ${mobileFiltersOpen ? "block" : "hidden lg:block"}`}>
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 lg:hidden">
+                              <span className="text-xs font-semibold text-slate-700">Filtros</span>
+                              <button onClick={() => setMobileFiltersOpen(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <MapFilters
+                              filters={filters}
+                              onChange={setFilters}
+                              resultCount={filtered.length}
+                            />
                           </div>
-                          <MapFilters
-                            filters={filters}
-                            onChange={setFilters}
-                            resultCount={filtered.length}
-                          />
-                        </div>
+                        )}
 
-                        {/* Map — no flex-1 on mobile so h-[360px] is the authoritative height Leaflet sees */}
+                        {/* Map — swaps between mock (filtered) and live (Supabase) */}
                         <div className="min-w-0 lg:flex-1 rounded-2xl border border-slate-100 shadow-card overflow-hidden h-[360px] sm:h-[420px] lg:h-[520px]">
-                          <DashboardMap
-                            incidents={filtered}
-                            viewMode={viewMode}
-                          />
+                          {liveData ? (
+                            <LiveHeatmapMap />
+                          ) : (
+                            <DashboardMap incidents={filtered} viewMode={viewMode} />
+                          )}
                         </div>
 
                         {/* Right panels */}

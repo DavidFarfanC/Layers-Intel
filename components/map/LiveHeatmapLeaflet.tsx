@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 import type { GuardEvent, HeatmapPoint, HeatmapResponse } from "@/lib/types/heatmap";
@@ -34,7 +34,22 @@ function createExpandIcon(nivel: string | null): L.DivIcon {
   });
 }
 
+// ── CDMX bounding box for point validation ────────────────────────────────────
+
+const LAT_MIN = 18.0, LAT_MAX = 20.5;
+const LNG_MIN = -100.5, LNG_MAX = -98.0;
+
+function isValidHeatPoint([lat, lng]: [number, number, number]): boolean {
+  return (
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= LAT_MIN && lat <= LAT_MAX &&
+    lng >= LNG_MIN && lng <= LNG_MAX
+  );
+}
+
 // ── Inner: HeatLayer ──────────────────────────────────────────────────────────
+
+const MAX_RETRY = 8;
 
 interface HeatLayerProps {
   points:      HeatmapPoint[];
@@ -44,22 +59,72 @@ interface HeatLayerProps {
   radius?:     number;
   blur?:       number;
   maxOpacity?: number;
+  onWaiting?:  (waiting: boolean) => void;
 }
 
-function HeatLayer({ points, extraRaw, gradient, label, radius = 18, blur = 15, maxOpacity = 0.7 }: HeatLayerProps) {
-  const map = useMap();
+function HeatLayer({ points, extraRaw, gradient, label, radius = 18, blur = 15, maxOpacity = 0.7, onWaiting }: HeatLayerProps) {
+  const map   = useMap();
+  const cbRef = useRef(onWaiting);
+  cbRef.current = onWaiting;
 
   useEffect(() => {
-    const allData = buildHeatData(points, extraRaw);
+    const allData = buildHeatData(points, extraRaw).filter(isValidHeatPoint);
     if (!allData.length) return;
 
     ensureHeatPlugin();
     const lHeat = (L as any).heatLayer;
     if (typeof lHeat !== "function") return;
 
-    const layer = lHeat(allData, { radius, blur, maxZoom: 17, gradient, maxOpacity });
-    layer.addTo(map);
-    return () => { map.removeLayer(layer); };
+    let layerRef: any   = null;
+    let timer:    ReturnType<typeof setTimeout> | null = null;
+    let cancelled       = false;
+    let attempt         = 0;
+
+    function tryAdd() {
+      if (cancelled) return;
+
+      const size = map.getSize();
+      const el   = map.getContainer();
+
+      if (!size || size.x <= 0 || size.y <= 0 || el.clientWidth <= 0 || el.clientHeight <= 0) {
+        if (attempt < MAX_RETRY) {
+          attempt++;
+          cbRef.current?.(true);
+          try { map.invalidateSize({ animate: false }); } catch {}
+          timer = setTimeout(tryAdd, 200);
+        }
+        return;
+      }
+
+      cbRef.current?.(false);
+
+      try {
+        layerRef = lHeat(allData, { radius, blur, maxZoom: 17, gradient, maxOpacity });
+        layerRef.addTo(map);
+      } catch (err) {
+        console.warn(`[HeatLayer:${label}] addTo error (attempt ${attempt}):`, err);
+        layerRef = null;
+        if (attempt < MAX_RETRY) {
+          attempt++;
+          timer = setTimeout(tryAdd, 200);
+        }
+      }
+    }
+
+    tryAdd();
+
+    return () => {
+      cancelled = true;
+      if (timer !== null) clearTimeout(timer);
+      if (layerRef !== null) {
+        try {
+          if (map.hasLayer(layerRef)) map.removeLayer(layerRef);
+        } catch {}
+        layerRef = null;
+      }
+    };
+  // onWaiting is accessed via cbRef — intentionally omitted from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, points, extraRaw, gradient, label, radius, blur, maxOpacity]);
 
   return null;
@@ -218,6 +283,7 @@ export default function LiveHeatmapLeaflet({ points: externalPoints, recentGuard
   const [status,         setStatus]         = useState<"loading" | "ready" | "error">("loading");
   const [internalPoints, setInternalPoints] = useState<HeatmapPoint[]>([]);
   const [errMsg,         setErrMsg]         = useState<string>("");
+  const [heatWaiting,    setHeatWaiting]    = useState(false);
 
   useEffect(() => {
     if (externalPoints !== undefined) { setStatus("ready"); return; }
@@ -275,6 +341,7 @@ export default function LiveHeatmapLeaflet({ points: externalPoints, recentGuard
             label="events"
             radius={38}
             blur={28}
+            onWaiting={setHeatWaiting}
           />
         )}
 
@@ -288,6 +355,7 @@ export default function LiveHeatmapLeaflet({ points: externalPoints, recentGuard
             radius={45}
             blur={30}
             maxOpacity={0.95}
+            onWaiting={setHeatWaiting}
           />
         )}
 
@@ -308,6 +376,16 @@ export default function LiveHeatmapLeaflet({ points: externalPoints, recentGuard
         recentCount={recentGuardEvents.length}
         lastEvent={lastEvent}
       />
+
+      {heatWaiting && (
+        <div className="absolute inset-x-0 bottom-16 z-[1001] flex justify-center pointer-events-none">
+          <div className="bg-white/95 backdrop-blur-sm rounded-lg border border-amber-200 shadow-sm px-3 py-1.5">
+            <span className="text-[10px] text-amber-700 font-medium">
+              Heatmap esperando tamaño del contenedor…
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,15 +9,16 @@ const CELL_SIZE = 0.01;
 // ── Grid aggregation ──────────────────────────────────────────────────────────
 
 interface GridCell {
-  lat:             number;
-  lng:             number;
-  count:           number;
-  eventsCount:     number;
-  guardCount:      number;
-  totalIntensity:  number;
-  height:          number;
-  isRecent:        boolean;
-  recentIntensity: number;
+  lat:              number;
+  lng:              number;
+  count:            number;
+  eventsCount:      number;
+  guardCount:       number;
+  totalIntensity:   number;
+  height:           number;
+  isRecent:         boolean;
+  recentIntensity:  number;
+  recentGuardCount: number;
 }
 
 function buildGrid(points: HeatmapPoint[], recentEvents: GuardEvent[] = []): GridCell[] {
@@ -29,7 +30,7 @@ function buildGrid(points: HeatmapPoint[], recentEvents: GuardEvent[] = []): Gri
     const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
 
     if (!cells.has(key)) {
-      cells.set(key, { lat, lng, count: 0, eventsCount: 0, guardCount: 0, totalIntensity: 0, height: 200, isRecent: false, recentIntensity: 0 });
+      cells.set(key, { lat, lng, count: 0, eventsCount: 0, guardCount: 0, totalIntensity: 0, height: 200, isRecent: false, recentIntensity: 0, recentGuardCount: 0 });
     }
     const c = cells.get(key)!;
     c.count++;
@@ -38,25 +39,26 @@ function buildGrid(points: HeatmapPoint[], recentEvents: GuardEvent[] = []): Gri
     else                       c.guardCount++;
   }
 
-  // Mark cells near recent events and boost their height
   for (const ev of recentEvents) {
     const lat = Math.round(ev.lat / CELL_SIZE) * CELL_SIZE;
     const lng = Math.round(ev.lng / CELL_SIZE) * CELL_SIZE;
     const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
 
     if (!cells.has(key)) {
-      cells.set(key, { lat, lng, count: 1, eventsCount: 0, guardCount: 1, totalIntensity: ev.intensity, height: 200, isRecent: true, recentIntensity: ev.intensity });
+      cells.set(key, { lat, lng, count: 1, eventsCount: 0, guardCount: 1, totalIntensity: ev.intensity, height: 200, isRecent: true, recentIntensity: ev.intensity, recentGuardCount: 1 });
     }
     const c = cells.get(key)!;
-    c.isRecent        = true;
-    c.recentIntensity += ev.intensity;
+    c.isRecent = true;
+    c.recentIntensity  += ev.intensity;
+    c.recentGuardCount += 1;
   }
 
   return Array.from(cells.values())
     .map((c) => {
-      const baseHeight   = Math.min(5000, Math.max(200, c.count * 80)) + c.guardCount * 300;
-      const recentBoost  = c.isRecent ? c.recentIntensity * 10 * 350 : 0;
-      return { ...c, height: Math.min(15000, baseHeight + recentBoost) };
+      const base        = Math.min(2200, Math.max(120, c.count * 45));
+      const guardBoost  = c.guardCount * 75;
+      const recentBoost = c.recentGuardCount * 250;
+      return { ...c, height: Math.min(2800, base + guardBoost + recentBoost) };
     })
     .sort((a, b) => b.count - a.count)
     .slice(0, 1000);

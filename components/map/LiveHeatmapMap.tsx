@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { HeatmapPoint } from "@/lib/types/heatmap";
+import type { GuardEvent, HeatmapPoint } from "@/lib/types/heatmap";
 
 const LiveHeatmapLeaflet = dynamic(
   () => import("./LiveHeatmapLeaflet"),
@@ -18,12 +18,16 @@ const LiveHeatmapLeaflet = dynamic(
   }
 );
 
-// Parent container must have an explicit pixel height and position:relative.
-export default function LiveHeatmapMap({ points }: { points?: HeatmapPoint[] }) {
+interface Props {
+  points?:            HeatmapPoint[];
+  recentGuardEvents?: GuardEvent[];
+}
+
+export default function LiveHeatmapMap({ points, recentGuardEvents }: Props) {
   return (
     <div className="relative w-full h-full overflow-hidden rounded-xl">
       <div className="absolute inset-0">
-        <LiveHeatmapLeaflet points={points} />
+        <LiveHeatmapLeaflet points={points} recentGuardEvents={recentGuardEvents} />
       </div>
     </div>
   );

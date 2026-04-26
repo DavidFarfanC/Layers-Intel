@@ -14,6 +14,7 @@ export type PollingStatus = "loading" | "connected" | "polling" | "new-signal" |
 export interface PollingState {
   points:              HeatmapPoint[];
   recentPointIds:      string[];
+  recentGuardEvents:   GuardEvent[];
   notifications:       GuardNotification[];
   status:              PollingStatus;
   dismissNotification: (id: string) => void;
@@ -22,10 +23,11 @@ export interface PollingState {
 const POLL_INTERVAL_MS = 5_000;
 
 export function useHeatmapPolling(): PollingState {
-  const [points,         setPoints]         = useState<HeatmapPoint[]>([]);
-  const [recentPointIds, setRecentPointIds] = useState<string[]>([]);
-  const [notifications,  setNotifications]  = useState<GuardNotification[]>([]);
-  const [status,         setStatus]         = useState<PollingStatus>("loading");
+  const [points,             setPoints]             = useState<HeatmapPoint[]>([]);
+  const [recentPointIds,     setRecentPointIds]     = useState<string[]>([]);
+  const [recentGuardEvents,  setRecentGuardEvents]  = useState<GuardEvent[]>([]);
+  const [notifications,      setNotifications]      = useState<GuardNotification[]>([]);
+  const [status,             setStatus]             = useState<PollingStatus>("loading");
 
   // Store lastPollTime in a ref so the interval callback always sees the latest value
   // without being re-created on every state update.
@@ -98,6 +100,13 @@ export function useHeatmapPolling(): PollingState {
           setRecentPointIds(newIds);
           setTimeout(() => setRecentPointIds([]), 5_000);
 
+          // Recent guard events: keep for 30 seconds for visual amplification
+          setRecentGuardEvents((prev) => [...newEvents, ...prev].slice(0, 20));
+          setTimeout(() => {
+            const batchIds = new Set(newIds);
+            setRecentGuardEvents((prev) => prev.filter((e) => !batchIds.has(e.id)));
+          }, 30_000);
+
           setNotifications((prev) =>
             [
               ...newEvents.map((e) => ({ event: e, receivedAt: Date.now(), dismissed: false })),
@@ -119,5 +128,5 @@ export function useHeatmapPolling(): PollingState {
     return () => clearInterval(interval);
   }, []); // runs once — reads lastPollTimeRef via closure
 
-  return { points, recentPointIds, notifications, status, dismissNotification };
+  return { points, recentPointIds, recentGuardEvents, notifications, status, dismissNotification };
 }

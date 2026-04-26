@@ -162,7 +162,7 @@ function DetailModal({ event, onClose }: { event: GuardEvent; onClose: () => voi
 
 // ── Single notification card ──────────────────────────────────────────────────
 
-const AUTO_DISMISS_MS = 9_000;
+const AUTO_DISMISS_MS = 12_000;
 
 function NotificationCard({
   notification,
@@ -175,8 +175,8 @@ function NotificationCard({
 }) {
   const { event } = notification;
   const colors    = nivelColor(event.nivel);
+  const isRojo    = event.nivel?.toUpperCase() === "ROJO";
 
-  // Auto-dismiss after AUTO_DISMISS_MS
   useEffect(() => {
     const t = setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => clearTimeout(t);
@@ -185,34 +185,53 @@ function NotificationCard({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, x: 48, scale: 0.96 }}
+      initial={{ opacity: 0, x: 56, scale: 0.94 }}
       animate={{ opacity: 1, x: 0,  scale: 1    }}
-      exit={{    opacity: 0, x: 48, scale: 0.96 }}
-      transition={{ type: "spring", stiffness: 220, damping: 26 }}
-      className={`w-80 rounded-2xl bg-slate-900 border shadow-2xl overflow-hidden ${colors.border}`}
+      exit={{    opacity: 0, x: 56, scale: 0.94 }}
+      transition={{ type: "spring", stiffness: 240, damping: 24 }}
+      className={`w-80 rounded-2xl bg-slate-950 border-2 shadow-2xl overflow-hidden soc-alert-glow ${isRojo ? "border-red-700/80" : colors.border}`}
     >
       {/* Header strip */}
-      <div className={`${colors.bg} px-4 py-2.5 flex items-center justify-between`}>
+      <div className={`${isRojo ? "bg-red-950/80" : colors.bg} border-b ${isRojo ? "border-red-800/50" : colors.border} px-4 py-2.5 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-violet-300">
-            Nueva señal Layers Guard
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-red-300">
+            Alerta Crítica en Vivo
+          </span>
+          <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-red-600 text-[8px] font-black text-white uppercase tracking-wider animate-pulse">
+            EN VIVO
           </span>
         </div>
-        <button onClick={onDismiss} className="text-slate-500 hover:text-white transition-colors">
+        <button onClick={onDismiss} className="text-slate-600 hover:text-white transition-colors">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
+      {/* Impact metrics row */}
+      <div className="px-4 pt-3 pb-0 grid grid-cols-3 gap-1.5">
+        <div className="rounded-lg bg-slate-900 border border-slate-800 p-1.5 text-center">
+          <p className="text-[8px] uppercase tracking-widest text-slate-600 mb-0.5">Impacto</p>
+          <p className="text-[11px] font-black text-red-400">+{event.score ?? event.intensity.toFixed(0)}</p>
+        </div>
+        <div className="rounded-lg bg-slate-900 border border-slate-800 p-1.5 text-center">
+          <p className="text-[8px] uppercase tracking-widest text-slate-600 mb-0.5">Heatmap</p>
+          <p className="text-[11px] font-black text-violet-400">↑ activo</p>
+        </div>
+        <div className="rounded-lg bg-slate-900 border border-slate-800 p-1.5 text-center">
+          <p className="text-[8px] uppercase tracking-widest text-slate-600 mb-0.5">3D Vol.</p>
+          <p className="text-[11px] font-black text-violet-400">↑ celda</p>
+        </div>
+      </div>
+
       {/* Body */}
       <div className="px-4 py-3 space-y-2.5">
-        {/* Nivel + score */}
+        {/* Nivel + score + intensity */}
         <div className="flex items-center gap-2">
           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${colors.badge}`}>
             {event.nivel ?? "DESCONOCIDO"}
           </span>
           {event.score != null && (
-            <span className="text-[10px] text-slate-400">
+            <span className="text-[10px] text-slate-500">
               Score: <span className="font-semibold text-white">{event.score}</span>
             </span>
           )}
@@ -222,32 +241,31 @@ function NotificationCard({
         </div>
 
         {/* Description */}
-        <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-          Alerta{event.nivel ? ` ${event.nivel}` : ""} detectada
+        <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
+          {event.nivel ? `Alerta ${event.nivel}` : "Señal"} detectada
           {event.fuente ? ` desde ${event.fuente}` : ""}
           {event.company ? ` · ${event.company}` : ""}
         </p>
 
         {/* Quick info */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
-          {event.fuente && (
-            <><span className="text-slate-500">Fuente</span><span className="text-slate-300 truncate">{event.fuente}</span></>
-          )}
-          <span className="text-slate-500 flex items-center gap-1"><MapPin className="h-2.5 w-2.5" />Coords</span>
+          <span className="text-slate-600 flex items-center gap-1"><MapPin className="h-2.5 w-2.5" />Coords</span>
           <span className="text-slate-400 font-mono">{event.lat.toFixed(3)}, {event.lng.toFixed(3)}</span>
           {event.timestamp_event && (
-            <><span className="text-slate-500 flex items-center gap-1"><Clock className="h-2.5 w-2.5" />Hora</span>
-            <span className="text-slate-300">{new Date(event.timestamp_event).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span></>
+            <>
+              <span className="text-slate-600 flex items-center gap-1"><Clock className="h-2.5 w-2.5" />Hora</span>
+              <span className="text-slate-300">{new Date(event.timestamp_event).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
+            </>
           )}
         </div>
 
         {/* Action */}
         <button
           onClick={onViewDetails}
-          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-violet-700 hover:bg-violet-600 text-white text-xs font-semibold py-2 transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-red-700 hover:bg-red-600 text-white text-xs font-bold py-2 transition-colors"
         >
           <Activity className="h-3.5 w-3.5" />
-          Ver detalles
+          Ver detalles completos
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>

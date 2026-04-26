@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { HeatmapPoint } from "@/lib/types/heatmap";
+import type { GuardEvent, HeatmapPoint } from "@/lib/types/heatmap";
 
 const RealPointsMap = dynamic(
   () => import("./RealPointsMap"),
@@ -19,15 +19,20 @@ const RealPointsMap = dynamic(
 );
 
 interface Props {
-  points?:         HeatmapPoint[];
-  recentPointIds?: string[];
+  points?:            HeatmapPoint[];
+  recentPointIds?:    string[];
+  recentGuardEvents?: GuardEvent[];
 }
 
-export default function RealPointsMapWrapper({ points, recentPointIds }: Props) {
+export default function RealPointsMapWrapper({ points, recentPointIds, recentGuardEvents }: Props) {
   return (
     <div className="relative w-full h-full overflow-hidden rounded-xl">
       <div className="absolute inset-0">
-        <RealPointsMap points={points} recentPointIds={recentPointIds} />
+        <RealPointsMap
+          points={points}
+          recentPointIds={recentPointIds}
+          recentGuardEvents={recentGuardEvents}
+        />
       </div>
     </div>
   );

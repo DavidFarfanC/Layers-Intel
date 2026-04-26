@@ -107,7 +107,10 @@ export default function DashboardPage() {
   const [mapView,         setMapView]         = useState<MapView>("points");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  const { points, recentPointIds, notifications, status: pollingStatus, dismissNotification } = useHeatmapPolling();
+  const {
+    points, recentPointIds, recentGuardEvents,
+    notifications, status: pollingStatus, dismissNotification,
+  } = useHeatmapPolling();
 
   useEffect(() => {
     if (!isAuthenticated()) router.replace("/login");
@@ -332,6 +335,7 @@ export default function DashboardPage() {
                                   <RealPointsMapWrapper
                                     points={points.length > 0 ? points : undefined}
                                     recentPointIds={recentPointIds}
+                                    recentGuardEvents={recentGuardEvents}
                                   />
                                 </motion.div>
                               )}
@@ -341,7 +345,10 @@ export default function DashboardPage() {
                                   transition={{ duration: 0.2 }}
                                   style={{ position: "relative", width: "100%", height: "100%" }}
                                 >
-                                  <LiveHeatmapMap points={points.length > 0 ? points : undefined} />
+                                  <LiveHeatmapMap
+                                    points={points.length > 0 ? points : undefined}
+                                    recentGuardEvents={recentGuardEvents}
+                                  />
                                 </motion.div>
                               )}
                               {mapView === "3d" && (
@@ -349,7 +356,10 @@ export default function DashboardPage() {
                                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                                   transition={{ duration: 0.2 }}
                                 >
-                                  <Mapbox3DVolumeMapWrapper points={points.length > 0 ? points : undefined} />
+                                  <Mapbox3DVolumeMapWrapper
+                                    points={points.length > 0 ? points : undefined}
+                                    recentGuardEvents={recentGuardEvents}
+                                  />
                                 </motion.div>
                               )}
                             </AnimatePresence>

@@ -2,23 +2,25 @@
 
 // CSS is loaded globally via app/globals.css @import "mapbox-gl/dist/mapbox-gl.css"
 import { useEffect, useRef, useState } from "react";
-import type { HeatmapPoint, HeatmapResponse } from "@/lib/types/heatmap";
+import type { GuardEvent, HeatmapPoint, HeatmapResponse } from "@/lib/types/heatmap";
 
 const CELL_SIZE = 0.01;
 
 // ── Grid aggregation ──────────────────────────────────────────────────────────
 
 interface GridCell {
-  lat:            number;
-  lng:            number;
-  count:          number;
-  eventsCount:    number;
-  guardCount:     number;
-  totalIntensity: number;
-  height:         number;
+  lat:             number;
+  lng:             number;
+  count:           number;
+  eventsCount:     number;
+  guardCount:      number;
+  totalIntensity:  number;
+  height:          number;
+  isRecent:        boolean;
+  recentIntensity: number;
 }
 
-function buildGrid(points: HeatmapPoint[]): GridCell[] {
+function buildGrid(points: HeatmapPoint[], recentEvents: GuardEvent[] = []): GridCell[] {
   const cells = new Map<string, GridCell>();
 
   for (const p of points) {
@@ -27,9 +29,8 @@ function buildGrid(points: HeatmapPoint[]): GridCell[] {
     const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
 
     if (!cells.has(key)) {
-      cells.set(key, { lat, lng, count: 0, eventsCount: 0, guardCount: 0, totalIntensity: 0, height: 200 });
+      cells.set(key, { lat, lng, count: 0, eventsCount: 0, guardCount: 0, totalIntensity: 0, height: 200, isRecent: false, recentIntensity: 0 });
     }
-
     const c = cells.get(key)!;
     c.count++;
     c.totalIntensity += p.intensity;
@@ -37,11 +38,26 @@ function buildGrid(points: HeatmapPoint[]): GridCell[] {
     else                       c.guardCount++;
   }
 
+  // Mark cells near recent events and boost their height
+  for (const ev of recentEvents) {
+    const lat = Math.round(ev.lat / CELL_SIZE) * CELL_SIZE;
+    const lng = Math.round(ev.lng / CELL_SIZE) * CELL_SIZE;
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+    if (!cells.has(key)) {
+      cells.set(key, { lat, lng, count: 1, eventsCount: 0, guardCount: 1, totalIntensity: ev.intensity, height: 200, isRecent: true, recentIntensity: ev.intensity });
+    }
+    const c = cells.get(key)!;
+    c.isRecent        = true;
+    c.recentIntensity += ev.intensity;
+  }
+
   return Array.from(cells.values())
-    .map((c) => ({
-      ...c,
-      height: Math.min(5000, Math.max(200, c.count * 80)) + c.guardCount * 300,
-    }))
+    .map((c) => {
+      const baseHeight   = Math.min(5000, Math.max(200, c.count * 80)) + c.guardCount * 300;
+      const recentBoost  = c.isRecent ? c.recentIntensity * 10 * 350 : 0;
+      return { ...c, height: Math.min(15000, baseHeight + recentBoost) };
+    })
     .sort((a, b) => b.count - a.count)
     .slice(0, 1000);
 }
@@ -67,6 +83,7 @@ function toGeoJSON(cells: GridCell[]) {
         guardCount:     c.guardCount,
         totalIntensity: Math.round(c.totalIntensity),
         height:         c.height,
+        isRecent:       c.isRecent ? 1 : 0,
         lat:            c.lat.toFixed(4),
         lng:            c.lng.toFixed(4),
       },
@@ -77,13 +94,13 @@ function toGeoJSON(cells: GridCell[]) {
 // ── Overlay panel ─────────────────────────────────────────────────────────────
 
 function MapOverlays({
-  total,
-  cells,
-  dataLoading,
+  total, cells, dataLoading, recentCount, lastRecentEvent,
 }: {
-  total:       number;
-  cells:       number;
-  dataLoading: boolean;
+  total:            number;
+  cells:            number;
+  dataLoading:      boolean;
+  recentCount:      number;
+  lastRecentEvent:  GuardEvent | null;
 }) {
   return (
     <>
@@ -115,10 +132,11 @@ function MapOverlays({
         <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Densidad</p>
         <div className="space-y-1.5">
           {[
-            { color: "#7c3aed", label: "Alertas Guard"  },
-            { color: "#dc2626", label: "Muy alta (>50)"  },
-            { color: "#f97316", label: "Alta (>20)"      },
-            { color: "#facc15", label: "Normal"          },
+            { color: "#9333ea", label: "Señal Guard reciente" },
+            { color: "#7c3aed", label: "Alertas Guard"        },
+            { color: "#dc2626", label: "Muy alta (>50)"       },
+            { color: "#f97316", label: "Alta (>20)"           },
+            { color: "#facc15", label: "Normal"               },
           ].map(({ color, label }) => (
             <div key={label} className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
@@ -127,6 +145,20 @@ function MapOverlays({
           ))}
         </div>
       </div>
+
+      {/* Recent impact — bottom right */}
+      {recentCount > 0 && lastRecentEvent && (
+        <div className="absolute bottom-10 right-3 z-[200] bg-black/80 backdrop-blur-md rounded-xl border border-red-900/60 px-3 py-2 pointer-events-none">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-red-400">Impacto activo</span>
+          </div>
+          <p className="text-[10px] font-bold text-white">Volumetría aumentada</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">
+            +{lastRecentEvent.intensity.toFixed(1)} · {recentCount} señal{recentCount > 1 ? "es" : ""}
+          </p>
+        </div>
+      )}
     </>
   );
 }
@@ -176,13 +208,15 @@ function NoTokenState() {
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
-  points?: HeatmapPoint[];
+  points?:            HeatmapPoint[];
+  recentGuardEvents?: GuardEvent[];
 }
 
-export default function Mapbox3DVolumeMap({ points: externalPoints }: Props) {
+export default function Mapbox3DVolumeMap({ points: externalPoints, recentGuardEvents = [] }: Props) {
   const containerRef        = useRef<HTMLDivElement>(null);
   const mapRef              = useRef<any>(null);
   const standaloneLoadedRef = useRef(false);
+  const standalonePointsRef = useRef<HeatmapPoint[]>([]);
 
   const [mapError,    setMapError]    = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -193,12 +227,12 @@ export default function Mapbox3DVolumeMap({ points: externalPoints }: Props) {
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
   // ── Applies a point array to the grid source ────────────────────────────────
-  function applyPoints(pts: HeatmapPoint[]) {
+  function applyPoints(pts: HeatmapPoint[], recentEvts: GuardEvent[] = []) {
     const map = mapRef.current;
     if (!map) return;
     const src = map.getSource("grid");
     if (!src) return;
-    const cells = buildGrid(pts);
+    const cells = buildGrid(pts, recentEvts);
     src.setData(toGeoJSON(cells));
     setTotal(pts.length);
     setCellCount(cells.length);
@@ -258,14 +292,22 @@ export default function Mapbox3DVolumeMap({ points: externalPoints }: Props) {
             paint:  {
               "fill-extrusion-color": [
                 "case",
+                // Recent guard event — bright purple/crimson
+                ["==", ["get", "isRecent"], 1],
+                  ["case",
+                    [">", ["get", "guardCount"], 0], "#9333ea",
+                    "#7f1d1d",
+                  ],
+                // Normal guard
                 [">", ["get", "guardCount"], 0], "#7c3aed",
                 [">", ["get", "count"],      50], "#dc2626",
                 [">", ["get", "count"],      20], "#f97316",
                 "#facc15",
               ],
-              "fill-extrusion-height":  ["get", "height"],
-              "fill-extrusion-base":    0,
-              "fill-extrusion-opacity": 0.85,
+              "fill-extrusion-height":             ["get", "height"],
+              "fill-extrusion-base":               0,
+              "fill-extrusion-opacity":            0.85,
+              "fill-extrusion-height-transition":  { duration: 1200, delay: 0 },
             },
           });
 
@@ -313,12 +355,12 @@ export default function Mapbox3DVolumeMap({ points: externalPoints }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Data effect: fires when map is ready or external points change ──────────
+  // ── Data effect: fires when map is ready, points change, or recent events change ──
   useEffect(() => {
     if (!mapLoaded) return;
 
     if (externalPoints !== undefined) {
-      applyPoints(externalPoints);
+      applyPoints(externalPoints, recentGuardEvents);
     } else if (!standaloneLoadedRef.current) {
       standaloneLoadedRef.current = true;
       fetch("/api/heatmap")
@@ -326,14 +368,20 @@ export default function Mapbox3DVolumeMap({ points: externalPoints }: Props) {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return r.json() as Promise<HeatmapResponse>;
         })
-        .then((data) => { applyPoints(data.points ?? []); })
+        .then((data) => {
+          standalonePointsRef.current = data.points ?? [];
+          applyPoints(standalonePointsRef.current, recentGuardEvents);
+        })
         .catch((err: any) => {
           console.error("[Mapbox3D] data fetch error:", err);
           setDataLoading(false);
         });
+    } else if (standalonePointsRef.current.length > 0) {
+      // Standalone data already loaded — re-apply with updated recent events
+      applyPoints(standalonePointsRef.current, recentGuardEvents);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLoaded, externalPoints]);
+  }, [mapLoaded, externalPoints, recentGuardEvents]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -348,8 +396,13 @@ export default function Mapbox3DVolumeMap({ points: externalPoints }: Props) {
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
       />
 
-      {/* Overlays sit on top with high z-index + pointer-events-none */}
-      <MapOverlays total={total} cells={cellCount} dataLoading={dataLoading} />
+      <MapOverlays
+        total={total}
+        cells={cellCount}
+        dataLoading={dataLoading}
+        recentCount={recentGuardEvents.length}
+        lastRecentEvent={recentGuardEvents[0] ?? null}
+      />
     </div>
   );
 }

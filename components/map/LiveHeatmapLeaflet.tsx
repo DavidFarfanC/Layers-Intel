@@ -2,81 +2,100 @@
 
 import "leaflet/dist/leaflet.css";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import L from "leaflet";
-import { MapContainer, TileLayer, useMap } from "react-leaflet";
-import type { HeatmapPoint, HeatmapResponse } from "@/lib/types/heatmap";
+import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
+import type { GuardEvent, HeatmapPoint, HeatmapResponse } from "@/lib/types/heatmap";
 
 // ── leaflet.heat loader ───────────────────────────────────────────────────────
-// Load once per browser session; guards against double-require.
+
 let heatPluginLoaded = false;
 function ensureHeatPlugin() {
   if (heatPluginLoaded) return;
-  // @ts-ignore — leaflet.heat has no bundled TS types
+  // @ts-ignore
   require("leaflet.heat");
   heatPluginLoaded = true;
-  console.log(
-    "[LiveHeatmap] leaflet.heat loaded. L.heatLayer available:",
-    typeof (L as any).heatLayer === "function"
-  );
 }
 
-// ── Inner component: renders one heat layer inside MapContainer ───────────────
+// ── Expand icon per recent event ──────────────────────────────────────────────
+
+function createExpandIcon(nivel: string | null): L.DivIcon {
+  const lvl   = nivel?.toUpperCase();
+  const color = lvl === "ROJO" ? "#dc2626" : lvl === "NARANJA" ? "#f97316" : "#7c3aed";
+  const label = nivel ? `Nueva señal ${nivel}` : "Nueva señal";
+  return L.divIcon({
+    html: `<div style="position:relative;width:90px;height:90px;">
+      <div class="guard-expand-ring" style="border:2.5px solid ${color};box-shadow:0 0 12px 0 ${color}88;"></div>
+      <span class="guard-signal-label" style="color:${color};">${label}</span>
+    </div>`,
+    className: "",
+    iconSize:   [90, 90],
+    iconAnchor: [45, 45],
+  });
+}
+
+// ── Inner: HeatLayer ──────────────────────────────────────────────────────────
 
 interface HeatLayerProps {
-  points:   HeatmapPoint[];
-  gradient: Record<number, string>;
-  label:    string;
-  radius?:  number;
-  blur?:    number;
+  points:      HeatmapPoint[];
+  extraRaw?:   [number, number, number][];
+  gradient:    Record<number, string>;
+  label:       string;
+  radius?:     number;
+  blur?:       number;
+  maxOpacity?: number;
 }
 
-function HeatLayer({ points, gradient, label, radius = 18, blur = 15 }: HeatLayerProps) {
+function HeatLayer({ points, extraRaw, gradient, label, radius = 18, blur = 15, maxOpacity = 0.7 }: HeatLayerProps) {
   const map = useMap();
 
   useEffect(() => {
-    if (!points.length) {
-      console.log(`[HeatLayer:${label}] skip — 0 points`);
-      return;
-    }
+    const allData = buildHeatData(points, extraRaw);
+    if (!allData.length) return;
 
     ensureHeatPlugin();
-
     const lHeat = (L as any).heatLayer;
-    if (typeof lHeat !== "function") {
-      console.error(`[HeatLayer:${label}] L.heatLayer is not a function — leaflet.heat did not load`);
-      return;
-    }
+    if (typeof lHeat !== "function") return;
 
-    // Use reduce (not spread) to avoid call-stack overflow on large arrays
-    const maxIntensity = points.reduce((m, p) => Math.max(m, p.intensity), 1);
-
-    // Enforce source-specific minimums so points are always visible
-    const minWeight = label === "guard" ? 0.9 : 0.75;
-    const heatData: [number, number, number][] = points.map((p) => [
-      p.lat,
-      p.lng,
-      Math.max(minWeight, p.intensity / maxIntensity),
-    ]);
-
-    console.log(
-      `[HeatLayer:${label}] adding ${heatData.length} pts, maxIntensity=${maxIntensity}, radius=${radius}`
-    );
-
-    const layer = lHeat(heatData, { radius, blur, maxZoom: 17, gradient });
+    const layer = lHeat(allData, { radius, blur, maxZoom: 17, gradient, maxOpacity });
     layer.addTo(map);
-    console.log(`[HeatLayer:${label}] layer added to map`);
-
-    return () => {
-      map.removeLayer(layer);
-      console.log(`[HeatLayer:${label}] layer removed (cleanup)`);
-    };
-  }, [map, points, gradient, label, radius, blur]);
+    return () => { map.removeLayer(layer); };
+  }, [map, points, extraRaw, gradient, label, radius, blur, maxOpacity]);
 
   return null;
 }
 
-// ── Gradient presets ─────────────────────────────────────────────────────────
+function buildHeatData(
+  points:   HeatmapPoint[],
+  extraRaw: [number, number, number][] = [],
+): [number, number, number][] {
+  const maxIntensity = points.reduce((m, p) => Math.max(m, p.intensity), 1);
+  const base = points.map<[number, number, number]>((p) => [
+    p.lat,
+    p.lng,
+    Math.max(p.source === "layers_guard" ? 0.9 : 0.75, p.intensity / maxIntensity),
+  ]);
+  return [...base, ...extraRaw];
+}
+
+// ── Jitter amplification for recent events ────────────────────────────────────
+
+function buildJitterPoints(events: GuardEvent[]): [number, number, number][] {
+  const out: [number, number, number][] = [];
+  for (const ev of events) {
+    const w = Math.min(1.0, Math.max(0.78, ev.intensity / 5));
+    for (let i = 0; i < 12; i++) {
+      out.push([
+        ev.lat + (Math.random() - 0.5) * 0.004,
+        ev.lng + (Math.random() - 0.5) * 0.004,
+        w,
+      ]);
+    }
+  }
+  return out;
+}
+
+// ── Gradient presets ──────────────────────────────────────────────────────────
 
 const EVENTS_GRADIENT: Record<number, string> = {
   0.10: "#fef3c7",
@@ -85,11 +104,14 @@ const EVENTS_GRADIENT: Record<number, string> = {
   0.70: "#ef4444",
   1.00: "#7f1d1d",
 };
+
 const GUARD_GRADIENT: Record<number, string> = {
-  0.10: "#ede9fe",
-  0.30: "#a78bfa",
-  0.55: "#7c3aed",
-  0.80: "#4c1d95",
+  0.10: "#fde68a",
+  0.25: "#f59e0b",
+  0.45: "#f97316",
+  0.65: "#ef4444",
+  0.85: "#dc2626",
+  1.00: "#450a0a",
 };
 
 // ── Loading / error states ────────────────────────────────────────────────────
@@ -121,7 +143,15 @@ function ErrorState({ message }: { message: string }) {
 
 // ── Overlays ──────────────────────────────────────────────────────────────────
 
-function Overlays({ total, eventCount, guardCount }: { total: number; eventCount: number; guardCount: number }) {
+function Overlays({
+  total, eventCount, guardCount, recentCount, lastEvent,
+}: {
+  total:       number;
+  eventCount:  number;
+  guardCount:  number;
+  recentCount: number;
+  lastEvent:   GuardEvent | null;
+}) {
   return (
     <>
       {/* Counter — top right */}
@@ -157,6 +187,22 @@ function Overlays({ total, eventCount, guardCount }: { total: number; eventCount
       <div className="absolute top-3 left-3 z-[1000] bg-white/90 backdrop-blur-md rounded-lg border border-slate-100 shadow-sm px-2.5 py-1.5 pointer-events-none">
         <span className="text-[10px] font-semibold text-slate-600">Datos reales · Supabase</span>
       </div>
+
+      {/* Recent impact metrics — bottom right */}
+      {recentCount > 0 && lastEvent && (
+        <div className="absolute bottom-3 right-3 z-[1000] bg-slate-900/90 backdrop-blur-md rounded-xl border border-red-900/60 shadow-lg px-3 py-2 pointer-events-none">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-red-400">Impacto activo</span>
+          </div>
+          <p className="text-[10px] font-bold text-white">
+            +{lastEvent.intensity.toFixed(1)} criticidad
+          </p>
+          <p className="text-[9px] text-slate-400 mt-0.5">
+            {recentCount} señal{recentCount > 1 ? "es" : ""} reciente{recentCount > 1 ? "s" : ""} · &lt;30s
+          </p>
+        </div>
+      )}
     </>
   );
 }
@@ -164,41 +210,30 @@ function Overlays({ total, eventCount, guardCount }: { total: number; eventCount
 // ── Main export ───────────────────────────────────────────────────────────────
 
 interface LiveHeatmapLeafletProps {
-  points?: HeatmapPoint[];
+  points?:            HeatmapPoint[];
+  recentGuardEvents?: GuardEvent[];
 }
 
-export default function LiveHeatmapLeaflet({ points: externalPoints }: LiveHeatmapLeafletProps) {
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+export default function LiveHeatmapLeaflet({ points: externalPoints, recentGuardEvents = [] }: LiveHeatmapLeafletProps) {
+  const [status,         setStatus]         = useState<"loading" | "ready" | "error">("loading");
   const [internalPoints, setInternalPoints] = useState<HeatmapPoint[]>([]);
-  const [errMsg, setErrMsg] = useState<string>("");
+  const [errMsg,         setErrMsg]         = useState<string>("");
 
-  // Standalone fetch — only when no external points provided
   useEffect(() => {
-    if (externalPoints !== undefined) {
-      setStatus("ready");
-      return;
-    }
-
-    console.log("[LiveHeatmap] component mounted, starting fetch /api/heatmap");
+    if (externalPoints !== undefined) { setStatus("ready"); return; }
 
     fetch("/api/heatmap")
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`);
         return r.json() as Promise<HeatmapResponse>;
       })
-      .then((data) => {
-        setInternalPoints(data.points ?? []);
-        setStatus("ready");
-      })
+      .then((data) => { setInternalPoints(data.points ?? []); setStatus("ready"); })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[LiveHeatmap] fetch error:", msg);
-        setErrMsg(msg);
+        setErrMsg(err instanceof Error ? err.message : String(err));
         setStatus("error");
       });
   }, [externalPoints]);
 
-  // Switch to ready immediately when external points arrive
   useEffect(() => {
     if (externalPoints !== undefined) setStatus("ready");
   }, [externalPoints]);
@@ -207,8 +242,13 @@ export default function LiveHeatmapLeaflet({ points: externalPoints }: LiveHeatm
   const eventPoints = points.filter((p) => p.source === "events");
   const guardPoints = points.filter((p) => p.source === "layers_guard");
 
+  // Jitter amplification — recomputed only when recentGuardEvents changes
+  const guardJitter = useMemo(() => buildJitterPoints(recentGuardEvents), [recentGuardEvents]);
+
   if (status === "loading") return <LoadingState />;
   if (status === "error")   return <ErrorState message={errMsg} />;
+
+  const lastEvent = recentGuardEvents[0] ?? null;
 
   return (
     <div className="absolute inset-0">
@@ -227,7 +267,7 @@ export default function LiveHeatmapLeaflet({ points: externalPoints }: LiveHeatm
           maxZoom={20}
         />
 
-        {/* Territorial events — warm orange/red, high radius for density visibility */}
+        {/* Territorial events — warm orange/red */}
         {eventPoints.length > 0 && (
           <HeatLayer
             points={eventPoints}
@@ -238,24 +278,36 @@ export default function LiveHeatmapLeaflet({ points: externalPoints }: LiveHeatm
           />
         )}
 
-        {/* Layers Guard digital alerts — cool violet, slightly larger for prominence */}
-        {guardPoints.length > 0 && (
+        {/* Guard events — dramatic red gradient + jitter amplification */}
+        {(guardPoints.length > 0 || guardJitter.length > 0) && (
           <HeatLayer
             points={guardPoints}
+            extraRaw={guardJitter}
             gradient={GUARD_GRADIENT}
             label="guard"
-            radius={42}
-            blur={32}
+            radius={45}
+            blur={30}
+            maxOpacity={0.95}
           />
         )}
+
+        {/* Expand rings for newly-arrived guard events */}
+        {recentGuardEvents.map((ev) => (
+          <Marker
+            key={`expand-${ev.id}`}
+            position={[ev.lat, ev.lng]}
+            icon={createExpandIcon(ev.nivel)}
+          />
+        ))}
       </MapContainer>
 
       <Overlays
         total={points.length}
         eventCount={eventPoints.length}
         guardCount={guardPoints.length}
+        recentCount={recentGuardEvents.length}
+        lastEvent={lastEvent}
       />
-
     </div>
   );
 }

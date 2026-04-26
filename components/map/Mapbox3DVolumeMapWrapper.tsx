@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { HeatmapPoint } from "@/lib/types/heatmap";
+import type { GuardEvent, HeatmapPoint } from "@/lib/types/heatmap";
 
 const Mapbox3DVolumeMap = dynamic(
   () => import("./Mapbox3DVolumeMap"),
@@ -18,6 +18,11 @@ const Mapbox3DVolumeMap = dynamic(
   }
 );
 
-export default function Mapbox3DVolumeMapWrapper({ points }: { points?: HeatmapPoint[] }) {
-  return <Mapbox3DVolumeMap points={points} />;
+interface Props {
+  points?:            HeatmapPoint[];
+  recentGuardEvents?: GuardEvent[];
+}
+
+export default function Mapbox3DVolumeMapWrapper({ points, recentGuardEvents }: Props) {
+  return <Mapbox3DVolumeMap points={points} recentGuardEvents={recentGuardEvents} />;
 }

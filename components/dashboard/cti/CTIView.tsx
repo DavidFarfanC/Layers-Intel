@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import CTIMetricCards from "./CTIMetricCards";
 import SeverityDistribution from "./SeverityDistribution";
 import LayersGuardIngestion from "./LayersGuardIngestion";
@@ -8,10 +8,18 @@ import ArtifactsPanel from "./ArtifactsPanel";
 import PartnerEscalation from "./PartnerEscalation";
 import ImpactAnalytics from "./ImpactAnalytics";
 import IntelligenceQueue from "./IntelligenceQueue";
-import CaseDetailDrawer from "./CaseDetailDrawer";
+import AlertDetailDrawer from "./AlertDetailDrawer";
+import type { CaseStatus } from "@/lib/mock/ctiData";
 
 export default function CTIView() {
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedId, setSelectedId]         = useState<string | null>(null);
+  const [localStatuses, setLocalStatuses]   = useState<Record<string, CaseStatus>>({});
+
+  const handleStatusChange = useCallback((id: string, newStatus: CaseStatus) => {
+    setLocalStatuses((prev) => ({ ...prev, [id]: newStatus }));
+  }, []);
+
+  const handleClose = useCallback(() => setSelectedId(null), []);
 
   return (
     <div className="space-y-6">
@@ -26,7 +34,7 @@ export default function CTIView() {
       {/* KPI cards */}
       <CTIMetricCards />
 
-      {/* Row 1: Guard ingestion + severity + partners */}
+      {/* Row 1: Severity + Partners + System status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1">
           <SeverityDistribution />
@@ -35,7 +43,6 @@ export default function CTIView() {
           <PartnerEscalation />
         </div>
         <div className="lg:col-span-1">
-          {/* Live pulse badge */}
           <div className="rounded-2xl border border-slate-100 bg-gradient-to-br from-brand-600 to-brand-800 shadow-card p-5 text-white h-full flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-3">
@@ -44,7 +51,9 @@ export default function CTIView() {
                   Estado del sistema
                 </span>
               </div>
-              <p className="text-3xl font-bold tabular-nums">99.8<span className="text-lg font-normal text-brand-300">%</span></p>
+              <p className="text-3xl font-bold tabular-nums">
+                99.8<span className="text-lg font-normal text-brand-300">%</span>
+              </p>
               <p className="text-sm text-brand-200 mt-1">Disponibilidad Layers Guard</p>
             </div>
             <div className="mt-6 space-y-2">
@@ -69,17 +78,25 @@ export default function CTIView() {
       {/* Impact analytics */}
       <ImpactAnalytics />
 
-      {/* Row 2: Layers Guard ingestion feed */}
-      <LayersGuardIngestion />
+      {/* Layers Guard ingestion feed — clickable rows */}
+      <LayersGuardIngestion onSelectAlert={setSelectedId} />
 
       {/* Artifacts panel */}
       <ArtifactsPanel />
 
-      {/* Intelligence queue — full width */}
-      <IntelligenceQueue onSelectCase={setSelectedCaseId} />
+      {/* Intelligence queue — clickable rows + live status overrides */}
+      <IntelligenceQueue
+        onSelectCase={setSelectedId}
+        localStatuses={localStatuses}
+      />
 
-      {/* Case detail drawer */}
-      <CaseDetailDrawer caseId={selectedCaseId} onClose={() => setSelectedCaseId(null)} />
+      {/* Alert detail drawer */}
+      <AlertDetailDrawer
+        caseId={selectedId}
+        localStatus={selectedId ? localStatuses[selectedId] : undefined}
+        onClose={handleClose}
+        onStatusChange={handleStatusChange}
+      />
     </div>
   );
 }

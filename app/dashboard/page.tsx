@@ -35,6 +35,9 @@ import MapFilters from "@/components/map/MapFilters";
 import DashboardMap from "@/components/map/DashboardMap";
 import AnalyticsCharts from "@/components/charts/AnalyticsCharts";
 import CTIView from "@/components/dashboard/cti/CTIView";
+import DigitalSignalsView from "@/components/dashboard/sections/DigitalSignalsView";
+import ReportsView from "@/components/dashboard/sections/ReportsView";
+import SettingsView from "@/components/dashboard/sections/SettingsView";
 import type { MapViewMode } from "@/components/map/FilteredMapLeaflet";
 
 // ── Derived stats helpers ─────────────────────────────────────────────────────
@@ -507,10 +510,10 @@ export default function DashboardPage() {
               {/* ── CTI page ─────────────────────────────────────────────── */}
               {activePage === "cti" && <CTIView />}
 
-              {/* ── Placeholder pages ─────────────────────────────────────── */}
-              {activePage === "signals"  && <PlaceholderPage icon={Activity}  title="Señales Digitales" />}
-              {activePage === "reports"  && <PlaceholderPage icon={BarChart3} title="Informes"          />}
-              {activePage === "settings" && <PlaceholderPage icon={Activity}  title="Configuración"    />}
+              {/* ── Full sections ─────────────────────────────────────────── */}
+              {activePage === "signals"  && <DigitalSignalsView />}
+              {activePage === "reports"  && <ReportsView />}
+              {activePage === "settings" && <SettingsView />}
 
             </motion.div>
           </AnimatePresence>

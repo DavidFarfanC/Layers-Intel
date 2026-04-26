@@ -9,6 +9,7 @@ const TYPE_ICON: Record<ArtifactType, string> = {
   hash:   "MD5",
   url:    "URL",
   email:  "EML",
+  handle: "HDL",
 };
 
 const TYPE_COLOR: Record<ArtifactType, string> = {
@@ -17,6 +18,7 @@ const TYPE_COLOR: Record<ArtifactType, string> = {
   hash:   "bg-slate-100 text-slate-600",
   url:    "bg-orange-50 text-orange-700",
   email:  "bg-teal-50 text-teal-700",
+  handle: "bg-purple-50 text-purple-700",
 };
 
 export default function ArtifactsPanel() {

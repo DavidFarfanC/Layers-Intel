@@ -1,31 +1,39 @@
 "use client";
 
 import { Shield, CheckCircle2 } from "lucide-react";
-import { layersGuardEvents, getSeverityConfig, getPlatformConfig, type GuardEvent } from "@/lib/mock/ctiData";
+import { layersGuardEvents, getSeverityConfig, getPlatformConfig, getAlertCase, type GuardEvent } from "@/lib/mock/ctiData";
 
-function EventRow({ ev }: { ev: GuardEvent }) {
-  const sev = getSeverityConfig(ev.severity);
+interface Props {
+  onSelectAlert?: (id: string) => void;
+}
+
+function EventRow({ ev, onSelectAlert }: { ev: GuardEvent; onSelectAlert?: (id: string) => void }) {
+  const sev  = getSeverityConfig(ev.severity);
   const plat = getPlatformConfig(ev.platform);
   const time = new Date(ev.timestamp).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const hasDetail = !!getAlertCase(ev.id);
 
   return (
-    <div className={`flex gap-3 p-3 rounded-xl border transition-colors ${ev.processed ? "border-slate-100 bg-white" : "border-orange-100 bg-orange-50/40"}`}>
+    <div
+      onClick={() => hasDetail && onSelectAlert?.(ev.id)}
+      role={hasDetail ? "button" : undefined}
+      tabIndex={hasDetail ? 0 : undefined}
+      onKeyDown={(e) => e.key === "Enter" && hasDetail && onSelectAlert?.(ev.id)}
+      className={`flex gap-3 p-3 rounded-xl border transition-colors ${
+        ev.processed ? "border-slate-100 bg-white" : "border-orange-100 bg-orange-50/40"
+      } ${hasDetail ? "cursor-pointer hover:bg-slate-50 hover:border-slate-200 active:scale-[0.99]" : ""}`}
+    >
       {/* Severity dot */}
       <div className="mt-0.5 shrink-0">
-        <span
-          className="block h-2.5 w-2.5 rounded-full mt-1"
-          style={{ backgroundColor: sev.dot }}
-        />
+        <span className="block h-2.5 w-2.5 rounded-full mt-1" style={{ backgroundColor: sev.dot }} />
       </div>
 
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${sev.bg} ${sev.text}`}
-          >
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${sev.bg} ${sev.text}`}>
             {sev.label}
           </span>
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500"
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100"
             style={{ color: plat.color }}>
             {plat.label}
           </span>
@@ -34,19 +42,24 @@ function EventRow({ ev }: { ev: GuardEvent }) {
         <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{ev.snippet}</p>
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-slate-400">{ev.source}</span>
-          {ev.processed && (
-            <span className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
-              <CheckCircle2 className="h-3 w-3" />
-              Procesado
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {ev.processed && (
+              <span className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
+                <CheckCircle2 className="h-3 w-3" />
+                Procesado
+              </span>
+            )}
+            {hasDetail && (
+              <span className="text-[10px] font-semibold text-brand-600">Ver detalle →</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-export default function LayersGuardIngestion() {
+export default function LayersGuardIngestion({ onSelectAlert }: Props) {
   const unprocessed = layersGuardEvents.filter((e) => !e.processed).length;
 
   return (
@@ -59,7 +72,7 @@ export default function LayersGuardIngestion() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-800">Layers Guard — Ingesta</h3>
-            <p className="text-[11px] text-slate-400">Señales propietarias en tiempo real</p>
+            <p className="text-[11px] text-slate-400">Señales propietarias · click en alerta para ver detalle</p>
           </div>
         </div>
         {unprocessed > 0 && (
@@ -72,7 +85,7 @@ export default function LayersGuardIngestion() {
       {/* Scrollable event list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-[440px]">
         {layersGuardEvents.map((ev) => (
-          <EventRow key={ev.id} ev={ev} />
+          <EventRow key={ev.id} ev={ev} onSelectAlert={onSelectAlert} />
         ))}
       </div>
     </div>

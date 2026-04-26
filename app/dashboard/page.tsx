@@ -319,18 +319,20 @@ export default function DashboardPage() {
 
                           {/* Map container */}
                           <div
-                            className={`min-w-0 rounded-2xl border shadow-card overflow-hidden ${
-                              mapView === "3d"
+                            className={`relative min-w-0 rounded-2xl border shadow-card overflow-hidden
+                              min-h-[420px] sm:min-h-[500px] lg:min-h-[560px] xl:min-h-[620px]
+                              h-[calc(100vh-360px)] max-h-[720px]
+                              ${mapView === "3d"
                                 ? "w-full border-slate-800 bg-slate-900"
-                                : "lg:flex-1 border-slate-100 h-[360px] sm:h-[420px] lg:h-[520px]"
-                            }`}
+                                : "lg:flex-1 border-slate-100"
+                              }`}
                           >
                             <AnimatePresence mode="wait">
                               {mapView === "points" && (
-                                <motion.div key="points" className="absolute inset-0"
+                                <motion.div key="points"
                                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                                   transition={{ duration: 0.2 }}
-                                  style={{ position: "relative", width: "100%", height: "100%" }}
+                                  className="w-full h-full"
                                 >
                                   <RealPointsMapWrapper
                                     points={points.length > 0 ? points : undefined}
@@ -340,10 +342,10 @@ export default function DashboardPage() {
                                 </motion.div>
                               )}
                               {mapView === "heatmap" && (
-                                <motion.div key="heatmap" className="absolute inset-0"
+                                <motion.div key="heatmap"
                                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                                   transition={{ duration: 0.2 }}
-                                  style={{ position: "relative", width: "100%", height: "100%" }}
+                                  className="w-full h-full"
                                 >
                                   <LiveHeatmapMap
                                     points={points.length > 0 ? points : undefined}
@@ -355,6 +357,7 @@ export default function DashboardPage() {
                                 <motion.div key="3d"
                                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                                   transition={{ duration: 0.2 }}
+                                  className="w-full h-full"
                                 >
                                   <Mapbox3DVolumeMapWrapper
                                     points={points.length > 0 ? points : undefined}
@@ -367,7 +370,7 @@ export default function DashboardPage() {
 
                           {/* Right panels — only for 2D views */}
                           {mapView !== "3d" && (
-                            <div className="lg:w-64 lg:shrink-0 flex flex-col gap-4 lg:h-[520px] lg:overflow-y-auto">
+                            <div className="lg:w-64 lg:shrink-0 flex flex-col gap-4 lg:h-[calc(100vh-360px)] lg:max-h-[720px] lg:overflow-y-auto">
 
                               {/* Recent alerts */}
                               <div className="rounded-2xl border border-slate-100 bg-white shadow-card p-4">

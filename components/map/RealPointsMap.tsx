@@ -3,7 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import { useEffect, useState, useMemo } from "react";
 import L from "leaflet";
-import { MapContainer, TileLayer, CircleMarker, Popup, Marker } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, Marker, useMap } from "react-leaflet";
 import type { GuardEvent, HeatmapPoint, HeatmapResponse } from "@/lib/types/heatmap";
 
 const MAX_DISPLAY = 1000;
@@ -37,6 +37,19 @@ function createExpandIcon(nivel: string | null): L.DivIcon {
     iconSize:   [90, 90],
     iconAnchor: [45, 45],
   });
+}
+
+// ── Resize handler ────────────────────────────────────────────────────────────
+
+function ResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 100);
+    const handler = () => map.invalidateSize();
+    window.addEventListener("resize", handler);
+    return () => { clearTimeout(t); window.removeEventListener("resize", handler); };
+  }, [map]);
+  return null;
 }
 
 // ── Loading / error ───────────────────────────────────────────────────────────
@@ -181,6 +194,7 @@ export default function RealPointsMap({
         zoomControl={true}
         attributionControl={true}
       >
+        <ResizeHandler />
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'

@@ -47,6 +47,19 @@ function isValidHeatPoint([lat, lng]: [number, number, number]): boolean {
   );
 }
 
+// ── Resize handler ────────────────────────────────────────────────────────────
+
+function ResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 100);
+    const handler = () => map.invalidateSize();
+    window.addEventListener("resize", handler);
+    return () => { clearTimeout(t); window.removeEventListener("resize", handler); };
+  }, [map]);
+  return null;
+}
+
 // ── Inner: HeatLayer ──────────────────────────────────────────────────────────
 
 const MAX_RETRY = 8;
@@ -326,6 +339,7 @@ export default function LiveHeatmapLeaflet({ points: externalPoints, recentGuard
         zoomControl={true}
         attributionControl={true}
       >
+        <ResizeHandler />
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'

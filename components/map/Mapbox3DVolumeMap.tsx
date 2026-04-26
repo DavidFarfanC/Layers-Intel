@@ -349,8 +349,12 @@ export default function Mapbox3DVolumeMap({ points: externalPoints, recentGuardE
         setMapError(String(err));
       });
 
+    const resizeHandler = () => { if (!cancelled) mapRef.current?.resize(); };
+    window.addEventListener("resize", resizeHandler);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("resize", resizeHandler);
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -391,7 +395,7 @@ export default function Mapbox3DVolumeMap({ points: externalPoints, recentGuardE
   if (mapError) return <ErrorState message={mapError} />;
 
   return (
-    <div className="relative w-full" style={{ height: "600px", minHeight: "600px" }}>
+    <div className="relative w-full h-full">
       {/* Map canvas — explicit pixel dimensions guarantee WebGL initializes */}
       <div
         ref={containerRef}

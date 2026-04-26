@@ -26,7 +26,7 @@ interface Props {
 
 export default function RealPointsMapWrapper({ points, recentPointIds, recentGuardEvents }: Props) {
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-xl">
+    <div className="relative w-full h-full min-h-[420px] sm:min-h-[500px] overflow-hidden rounded-2xl">
       <div className="absolute inset-0">
         <RealPointsMap
           points={points}
